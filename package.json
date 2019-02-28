@@ -1,0 +1,44 @@
+{
+  "name": "trakr",
+  "version": "0.0.1",
+  "description": "Minimal utility for tracking performance",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scheibo/trakr.git"
+  },
+  "keywords": [
+    "minimal",
+    "timer",
+    "benchmark",
+    "profile",
+    "performance"
+  ],
+  "author": "Kirk Scheibelhut",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/scheibo/trakr/issues"
+  },
+  "dependencies": {
+    "@types/node": "^10.12.27"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.11",
+    "gts": "^0.9.0",
+    "jest": "^24.5.0",
+    "ts-jest": "^24.0.0",
+    "typescript": "^3.3.3333"
+  },
+  "scripts": {
+    "check": "gts check",
+    "clean": "gts clean",
+    "fix": "gts fix",
+    "compile": "tsc -p .",
+    "tsc": "tsc -p .",
+    "test": "jest",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile",
+    "posttest": "npm run check"
+  }
+}
