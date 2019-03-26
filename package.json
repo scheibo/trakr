@@ -1,6 +1,6 @@
 {
   "name": "trakr",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Minimal utility for tracking performance",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -21,14 +21,14 @@
     "url": "https://github.com/scheibo/trakr/issues"
   },
   "dependencies": {
-    "@types/node": "^10.12.27"
+    "@types/node": "^11.11.7"
   },
   "devDependencies": {
     "@types/jest": "^24.0.11",
     "gts": "^0.9.0",
     "jest": "^24.5.0",
     "ts-jest": "^24.0.0",
-    "typescript": "^3.3.3333"
+    "typescript": "^3.3.4000"
   },
   "scripts": {
     "check": "gts check",

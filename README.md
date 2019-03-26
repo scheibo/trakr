@@ -1,7 +1,7 @@
 # trakr
 [![npm version](https://img.shields.io/npm/v/trakr.svg)](https://www.npmjs.com/package/trakr)&nbsp;
 [![Build Status](https://api.travis-ci.org/scheibo/trakr.svg)](https://travis-ci.org/scheibo/trakr)&nbsp;
-[![Dependencies](https://img.shields.io/david/scheibo/trakr-node.svg)](https://david-dm.org/scheibo/trakr)
+[![Dependencies](https://img.shields.io/david/scheibo/trakr.svg)](https://david-dm.org/scheibo/trakr)
 
 trakr is a minimal library for tracking performance in Javascript applications
 in Node or in the browser.
