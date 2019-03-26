@@ -4,7 +4,8 @@
 [![Dependencies](https://img.shields.io/david/scheibo/trakr.svg)](https://david-dm.org/scheibo/trakr)
 
 trakr is a minimal library for tracking performance in Javascript applications
-in Node or in the browser.
+in Node or in the browser. A sibling library, [trakkr][1], exists to extend
+trakr with functionality around formatting/displaying outout and aggregation.
 
 ## API
 
@@ -30,7 +31,7 @@ in Node or in the browser.
     the `Tracker` will use only the memory it is provided to record its values
     (plus additional memory for each key), otherwise trakr will record every
     value `add`-ed to it. In the future, trakr may provide a sampled option (eg.
-    utilizing [reservoir sampling][1]), but currently prioritizes 100% accurate
+    utilizing [reservoir sampling][2]), but currently prioritizes 100% accurate
     data with the lowest possible CPU cost for local benchmarking purposes.
 
     If using the bounded option (recommended for performance to avoid
@@ -90,5 +91,6 @@ in Node or in the browser.
 
 trakr is distributed under the terms of the MIT License.
 
-[1]: https://en.wikipedia.org/wiki/Reservoir_sampling
+[1]: https://github.com/scheibo/trakkr
+[2]: https://en.wikipedia.org/wiki/Reservoir_sampling
 

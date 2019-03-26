@@ -71,7 +71,7 @@ export abstract class Tracker {
   }
 
   abstract add(name: string, val: number): void;
-  abstract stats(): Map<string, Stats>;
+  abstract stats(sample?: boolean): Map<string, Stats>;
 
   protected push(dists: Map<string, number[]>, name: string, val: number) {
     const d = dists.get(name) || [];
@@ -80,10 +80,10 @@ export abstract class Tracker {
   }
 
   // T(M, N): M(N lg N + 3N)
-  protected compute(dists: Map<string, number[]>) {
+  protected compute(dists: Map<string, number[]>, sample?: boolean) {
     const stats = new Map();
     for (const [name, vals] of dists.entries()) {
-      stats.set(name, Stats.compute(vals));
+      stats.set(name, Stats.compute(vals, sample));
     }
     return stats;
   }
@@ -101,8 +101,8 @@ class UnboundedTracker extends Tracker {
     return this.push(this.distributions, name, val);
   }
 
-  stats(): Map<string, Stats> {
-    return this.compute(this.distributions);
+  stats(sample?: boolean): Map<string, Stats> {
+    return this.compute(this.distributions, sample);
   }
 }
 
@@ -130,7 +130,7 @@ class BoundedTracker extends Tracker {
     this.next.loc += 9;
   }
 
-  stats(): Map<string, Stats> {
+  stats(sample?: boolean): Map<string, Stats> {
     if (this.next.dloc !== this.next.loc) {
       const names: string[] = [];
       for (const [name, tag] of this.tags.entries()) {
@@ -144,7 +144,7 @@ class BoundedTracker extends Tracker {
         this.next.dloc += 9;
       }
     }
-    return this.compute(this.distributions);
+    return this.compute(this.distributions, sample);
   }
 }
 
@@ -198,8 +198,8 @@ export abstract class Timer {
     if (!this.stopped) this.stopped = this.perf.now();
   }
 
-  stats(): Map<string, Stats> {
-    return this.tracker.stats();
+  stats(sample?: boolean): Map<string, Stats> {
+    return this.tracker.stats(sample);
   }
 
   // tslint:disable-next-line:no-any
@@ -246,11 +246,16 @@ class TracingTimer extends Timer {
   }
 }
 
+// clang-format off
 export interface Stats {
-  readonly tot: number;
-  readonly avg: number;
   readonly cnt: number;
+  readonly sum: number;
+  readonly avg: number;
+  readonly var: number;
   readonly std: number;
+  readonly sem: number;
+  readonly moe: number;
+  readonly rme: number;
   readonly min: number;
   readonly max: number;
   readonly p50: number;
@@ -258,21 +263,42 @@ export interface Stats {
   readonly p95: number;
   readonly p99: number;
 }
+// clang-format on
+
+// T-Distribution two-tailed critical values for 95% confidence.
+// http://www.itl.nist.gov/div898/handbook/eda/section3/eda3672.htm.
+const TABLE = [
+  12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
+  2.201,  2.179, 2.16,  2.145, 2.131, 2.12,  2.11,  2.101, 2.093, 2.086,
+  2.08,   2.074, 2.069, 2.064, 2.06,  2.056, 2.052, 2.048, 2.045, 2.042,
+];
+const TINF = 1.96;
 
 export class Stats {
   protected constructor() {}
 
-  // T(N): N lg N + 3N
-  static compute(arr: number[]): Stats {
-    const sorted = arr.slice();
-    sorted.sort((a, b) => a - b);
-    const sum = Stats.sum(sorted);
+  // T(N): N lg N + 4N
+  static compute(arr: number[], sample?: boolean): Stats {
+    const sorted = arr.slice();    // N
+    sorted.sort((a, b) => a - b);  // N lg N
+
+    const sum = Stats.sum(sorted);  // N
     const mean = Stats.mean(arr, sum);
+    const variance = Stats.variance(arr, sample, mean);  // 2N
+    const stddev = Math.sqrt(variance);
+    const error = Stats.standardErrorOfMean(sorted, sample, stddev);
+    const margin = Stats.marginOfError(sorted, sample, error);
+
+    // clang-format off
     return {
-      tot: sum,
-      avg: mean,
       cnt: sorted.length,
-      std: Stats.standardDeviation(sorted, mean),
+      sum,
+      avg: mean,
+      var : variance,
+      std: stddev,
+      sem: error,
+      moe: margin,
+      rme: Stats.relativeMarginOfError(sorted, sample, margin, mean),
       min: sorted[0],
       max: sorted[sorted.length - 1],
       p50: Stats.ptile(sorted, 0.50),
@@ -280,6 +306,7 @@ export class Stats {
       p95: Stats.ptile(sorted, 0.95),
       p99: Stats.ptile(sorted, 0.99),
     };
+    // clang-format on
   }
 
   // T(N): N
@@ -318,7 +345,7 @@ export class Stats {
     return Stats.percentile(arr, 0.5);
   }
 
-  // T(N): N lg N
+  // T(N): N lg N + N
   static percentile(arr: number[], p: number): number {
     const sorted = arr.slice();
     sorted.sort((a, b) => a - b);
@@ -341,13 +368,43 @@ export class Stats {
   }
 
   // T(N): 3N | 2N
-  static variance(arr: number[], mean?: number): number {
+  static variance(arr: number[], sample?: boolean, mean?: number): number {
+    if (!arr.length) return 0;
+    const n = !!sample ? arr.length - 1 : arr.length;
     const m = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
-    return Stats.mean(arr.map(num => Math.pow(num - m, 2)));
+    return Stats.sum(arr.map(num => Math.pow(num - m, 2))) / n;
   }
 
   // T(N): 3N | 2N
-  static standardDeviation(arr: number[], mean?: number): number {
-    return Math.sqrt(Stats.variance(arr, mean));
+  static standardDeviation(arr: number[], sample?: boolean, mean?: number):
+      number {
+    return Math.sqrt(Stats.variance(arr, sample, mean));
+  }
+
+  // T(N): 3N | 1
+  static standardErrorOfMean(arr: number[], sample?: boolean, std?: number) {
+    if (!arr.length) return 0;
+    const dev =
+        typeof std !== 'undefined' ? std : Stats.standardDeviation(arr, sample);
+    return dev / Math.sqrt(arr.length);
+  }
+
+  // T(N): 3N | 1
+  static marginOfError(arr: number[], sample?: boolean, sem?: number) {
+    if (!arr.length) return 0;
+    const err = typeof sem !== 'undefined' ?
+        sem :
+        Stats.standardErrorOfMean(arr, sample);
+    return err * (TABLE[(arr.length - 1) - 1] || TINF);
+  }
+
+  // T(N): 4N | 1
+  static relativeMarginOfError(
+      arr: number[], sample?: boolean, moe?: number, mean?: number) {
+    if (!arr.length) return 0;
+    const margin =
+        typeof moe !== 'undefined' ? moe : Stats.marginOfError(arr, sample);
+    const avg = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
+    return (margin / avg) * 100;
   }
 }

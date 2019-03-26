@@ -77,7 +77,7 @@ describe('Tracker', () => {
       tracker.add('foo', 2);
 
       const foo = tracker.stats().get('foo')!;
-      expect(foo.tot).toEqual(12);
+      expect(foo.sum).toEqual(12);
       expect(foo.avg).toEqual(6);
       expect(foo.cnt).toEqual(2);
 
@@ -85,7 +85,7 @@ describe('Tracker', () => {
       tracker.add('bar', 100);
 
       const bar = tracker.stats().get('bar')!;
-      expect(bar.tot).toEqual(126);
+      expect(bar.sum).toEqual(126);
       expect(bar.avg).toEqual(42);
       expect(bar.cnt).toEqual(3);
     });
@@ -99,7 +99,7 @@ describe('Tracker', () => {
       tracker.add('foo', 2);
 
       const foo = tracker.stats().get('foo')!;
-      expect(foo.tot).toEqual(12);
+      expect(foo.sum).toEqual(12);
       expect(foo.avg).toEqual(6);
       expect(foo.cnt).toEqual(2);
 
@@ -107,7 +107,7 @@ describe('Tracker', () => {
       tracker.add('bar', 100);
 
       const bar = tracker.stats().get('bar')!;
-      expect(bar.tot).toEqual(126);
+      expect(bar.sum).toEqual(126);
       expect(bar.avg).toEqual(42);
       expect(bar.cnt).toEqual(3);
     });
@@ -166,7 +166,7 @@ describe('Timer', () => {
 
       expect(result).toEqual(7);
       expect(stats.size).toEqual(1);
-      expect(stats.get('foo')!.tot).toEqual(3);
+      expect(stats.get('foo')!.sum).toEqual(3);
 
       expect(perf.mark).not.toHaveBeenCalled();
       expect(perf.measure).not.toHaveBeenCalled();
@@ -191,12 +191,14 @@ describe('Timer', () => {
 
       expect(result).toEqual(7);
       expect(stats.size).toEqual(1);
-      expect(stats.get('foo')!.tot).toEqual(3);
+      expect(stats.get('foo')!.sum).toEqual(3);
 
       expect(perf.measure).toHaveBeenCalledWith('foo', 'b|foo', 'e|foo');
     });
   });
 });
+
+const SAMPLE = true;
 
 describe('Stats', () => {
   test('max', () => {
@@ -233,13 +235,38 @@ describe('Stats', () => {
   });
 
   test('variance', () => {
-    expect(Stats.variance(array(100))).toEqual(833.25);
+    const arr = array(100);
+    expect(Stats.variance(arr)).toBeCloseTo(833.25);
+    expect(Stats.variance(arr, SAMPLE)).toBeCloseTo(841.67);
     expect(Stats.variance([])).toEqual(0);
   });
 
-  test('stdev', () => {
-    expect(Stats.standardDeviation(array(100))).toBeCloseTo(28.87);
+  test('standardDeviation', () => {
+    const arr = array(100);
+    expect(Stats.standardDeviation(arr)).toBeCloseTo(28.87);
+    expect(Stats.standardDeviation(arr, SAMPLE)).toBeCloseTo(29.01);
     expect(Stats.standardDeviation([])).toEqual(0);
+  });
+
+  test('standardErrorOfMean', () => {
+    const arr = array(100);
+    expect(Stats.standardErrorOfMean(arr)).toBeCloseTo(2.887);
+    expect(Stats.standardErrorOfMean(arr, SAMPLE)).toBeCloseTo(2.901);
+    expect(Stats.standardErrorOfMean([])).toEqual(0);
+  });
+
+  test('marginOfError', () => {
+    const arr = array(100);
+    expect(Stats.marginOfError(arr)).toBeCloseTo(5.66);
+    expect(Stats.marginOfError(arr, SAMPLE)).toBeCloseTo(5.69);
+    expect(Stats.marginOfError([])).toEqual(0);
+  });
+
+  test('relativeMarginOfError', () => {
+    const arr = array(100);
+    expect(Stats.relativeMarginOfError(arr)).toBeCloseTo(11.20);
+    expect(Stats.relativeMarginOfError(arr, SAMPLE)).toBeCloseTo(11.26);
+    expect(Stats.relativeMarginOfError([])).toEqual(0);
   });
 });
 
