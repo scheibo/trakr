@@ -353,7 +353,7 @@ export class Stats {
   }
 
   // PRE: arr = arr.sort((a, b) => a - b)
-  private static ptile(arr: number[], p: number): number {
+  static ptile(arr: number[], p: number): number {
     if (!arr.length) return 0;
     if (p <= 0) return arr[0];
     if (p >= 1) return arr[arr.length - 1];
