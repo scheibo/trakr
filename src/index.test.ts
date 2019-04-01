@@ -198,7 +198,7 @@ describe('Timer', () => {
   });
 });
 
-const SAMPLE = true;
+const POPULATION = true;
 
 describe('Stats', () => {
   test('max', () => {
@@ -236,36 +236,36 @@ describe('Stats', () => {
 
   test('variance', () => {
     const arr = array(100);
-    expect(Stats.variance(arr)).toBeCloseTo(833.25);
-    expect(Stats.variance(arr, SAMPLE)).toBeCloseTo(841.67);
+    expect(Stats.variance(arr)).toBeCloseTo(841.67);
+    expect(Stats.variance(arr, POPULATION)).toBeCloseTo(833.25);
     expect(Stats.variance([])).toEqual(0);
   });
 
   test('standardDeviation', () => {
     const arr = array(100);
-    expect(Stats.standardDeviation(arr)).toBeCloseTo(28.87);
-    expect(Stats.standardDeviation(arr, SAMPLE)).toBeCloseTo(29.01);
+    expect(Stats.standardDeviation(arr)).toBeCloseTo(29.01);
+    expect(Stats.standardDeviation(arr, POPULATION)).toBeCloseTo(28.87);
     expect(Stats.standardDeviation([])).toEqual(0);
   });
 
   test('standardErrorOfMean', () => {
     const arr = array(100);
-    expect(Stats.standardErrorOfMean(arr)).toBeCloseTo(2.887);
-    expect(Stats.standardErrorOfMean(arr, SAMPLE)).toBeCloseTo(2.901);
+    expect(Stats.standardErrorOfMean(arr)).toBeCloseTo(2.901);
+    expect(Stats.standardErrorOfMean(arr, POPULATION)).toBeCloseTo(2.887);
     expect(Stats.standardErrorOfMean([])).toEqual(0);
   });
 
   test('marginOfError', () => {
     const arr = array(100);
-    expect(Stats.marginOfError(arr)).toBeCloseTo(5.66);
-    expect(Stats.marginOfError(arr, SAMPLE)).toBeCloseTo(5.69);
+    expect(Stats.marginOfError(arr)).toBeCloseTo(5.69);
+    expect(Stats.marginOfError(arr, POPULATION)).toBeCloseTo(5.66);
     expect(Stats.marginOfError([])).toEqual(0);
   });
 
   test('relativeMarginOfError', () => {
     const arr = array(100);
-    expect(Stats.relativeMarginOfError(arr)).toBeCloseTo(11.20);
-    expect(Stats.relativeMarginOfError(arr, SAMPLE)).toBeCloseTo(11.26);
+    expect(Stats.relativeMarginOfError(arr)).toBeCloseTo(11.26);
+    expect(Stats.relativeMarginOfError(arr, POPULATION)).toBeCloseTo(11.20);
     expect(Stats.relativeMarginOfError([])).toEqual(0);
   });
 });

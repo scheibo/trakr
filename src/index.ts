@@ -71,7 +71,7 @@ export abstract class Tracker {
   }
 
   abstract add(name: string, val: number): void;
-  abstract stats(sample?: boolean): Map<string, Stats>;
+  abstract stats(pop?: boolean): Map<string, Stats>;
 
   protected push(dists: Map<string, number[]>, name: string, val: number) {
     const d = dists.get(name) || [];
@@ -80,10 +80,10 @@ export abstract class Tracker {
   }
 
   // T(M, N): M(N lg N + 3N)
-  protected compute(dists: Map<string, number[]>, sample?: boolean) {
+  protected compute(dists: Map<string, number[]>, pop?: boolean) {
     const stats = new Map();
     for (const [name, vals] of dists.entries()) {
-      stats.set(name, Stats.compute(vals, sample));
+      stats.set(name, Stats.compute(vals, pop));
     }
     return stats;
   }
@@ -101,8 +101,8 @@ class UnboundedTracker extends Tracker {
     return this.push(this.distributions, name, val);
   }
 
-  stats(sample?: boolean): Map<string, Stats> {
-    return this.compute(this.distributions, sample);
+  stats(pop?: boolean): Map<string, Stats> {
+    return this.compute(this.distributions, pop);
   }
 }
 
@@ -130,7 +130,7 @@ class BoundedTracker extends Tracker {
     this.next.loc += 9;
   }
 
-  stats(sample?: boolean): Map<string, Stats> {
+  stats(pop?: boolean): Map<string, Stats> {
     if (this.next.dloc !== this.next.loc) {
       const names: string[] = [];
       for (const [name, tag] of this.tags.entries()) {
@@ -144,7 +144,7 @@ class BoundedTracker extends Tracker {
         this.next.dloc += 9;
       }
     }
-    return this.compute(this.distributions, sample);
+    return this.compute(this.distributions, pop);
   }
 }
 
@@ -198,8 +198,8 @@ export abstract class Timer {
     if (!this.stopped) this.stopped = this.perf.now();
   }
 
-  stats(sample?: boolean): Map<string, Stats> {
-    return this.tracker.stats(sample);
+  stats(pop?: boolean): Map<string, Stats> {
+    return this.tracker.stats(pop);
   }
 
   // tslint:disable-next-line:no-any
@@ -278,16 +278,16 @@ export class Stats {
   protected constructor() {}
 
   // T(N): N lg N + 4N
-  static compute(arr: number[], sample?: boolean): Stats {
+  static compute(arr: number[], pop?: boolean): Stats {
     const sorted = arr.slice();    // N
     sorted.sort((a, b) => a - b);  // N lg N
 
     const sum = Stats.sum(sorted);  // N
     const mean = Stats.mean(arr, sum);
-    const variance = Stats.variance(arr, sample, mean);  // 2N
+    const variance = Stats.variance(arr, pop, mean);  // 2N
     const stddev = Math.sqrt(variance);
-    const error = Stats.standardErrorOfMean(sorted, sample, stddev);
-    const margin = Stats.marginOfError(sorted, sample, error);
+    const error = Stats.standardErrorOfMean(sorted, pop, stddev);
+    const margin = Stats.marginOfError(sorted, pop, error);
 
     // clang-format off
     return {
@@ -298,7 +298,7 @@ export class Stats {
       std: stddev,
       sem: error,
       moe: margin,
-      rme: Stats.relativeMarginOfError(sorted, sample, margin, mean),
+      rme: Stats.relativeMarginOfError(sorted, pop, margin, mean),
       min: sorted[0],
       max: sorted[sorted.length - 1],
       p50: Stats.ptile(sorted, 0.50),
@@ -368,42 +368,41 @@ export class Stats {
   }
 
   // T(N): 3N | 2N
-  static variance(arr: number[], sample?: boolean, mean?: number): number {
+  static variance(arr: number[], pop?: boolean, mean?: number): number {
     if (!arr.length) return 0;
-    const n = !!sample ? arr.length - 1 : arr.length;
+    const n = !!pop ? arr.length : arr.length - 1;
     const m = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
     return Stats.sum(arr.map(num => Math.pow(num - m, 2))) / n;
   }
 
   // T(N): 3N | 2N
-  static standardDeviation(arr: number[], sample?: boolean, mean?: number):
+  static standardDeviation(arr: number[], pop?: boolean, mean?: number):
       number {
-    return Math.sqrt(Stats.variance(arr, sample, mean));
+    return Math.sqrt(Stats.variance(arr, pop, mean));
   }
 
   // T(N): 3N | 1
-  static standardErrorOfMean(arr: number[], sample?: boolean, std?: number) {
+  static standardErrorOfMean(arr: number[], pop?: boolean, std?: number) {
     if (!arr.length) return 0;
     const dev =
-        typeof std !== 'undefined' ? std : Stats.standardDeviation(arr, sample);
+        typeof std !== 'undefined' ? std : Stats.standardDeviation(arr, pop);
     return dev / Math.sqrt(arr.length);
   }
 
   // T(N): 3N | 1
-  static marginOfError(arr: number[], sample?: boolean, sem?: number) {
+  static marginOfError(arr: number[], pop?: boolean, sem?: number) {
     if (!arr.length) return 0;
-    const err = typeof sem !== 'undefined' ?
-        sem :
-        Stats.standardErrorOfMean(arr, sample);
+    const err =
+        typeof sem !== 'undefined' ? sem : Stats.standardErrorOfMean(arr, pop);
     return err * (TABLE[(arr.length - 1) - 1] || TINF);
   }
 
   // T(N): 4N | 1
   static relativeMarginOfError(
-      arr: number[], sample?: boolean, moe?: number, mean?: number) {
+      arr: number[], pop?: boolean, moe?: number, mean?: number) {
     if (!arr.length) return 0;
     const margin =
-        typeof moe !== 'undefined' ? moe : Stats.marginOfError(arr, sample);
+        typeof moe !== 'undefined' ? moe : Stats.marginOfError(arr, pop);
     const avg = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
     return (margin / avg) * 100;
   }
