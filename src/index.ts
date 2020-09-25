@@ -1,4 +1,3 @@
-// tslint:disable-next-line:no-any
 const IDENTITY = (a: any) => a;
 
 interface Performance {
@@ -21,232 +20,6 @@ const NODE = typeof module !== 'undefined' && module.exports;
 // @ts-ignore
 const PERF: Performance = (NODE ? require('perf_hooks') : window).performance;
 
-export class Tracer {
-  readonly traceEvents?: TraceEvents;
-  tracing?: Tracing;
-
-  constructor(traceEvents?: TraceEvents) {
-    this.traceEvents = traceEvents;
-  }
-
-  get enabled() {
-    return !!(this.tracing && this.tracing.enabled);
-  }
-
-  enable(categories?: string[]) {
-    if (!this.traceEvents || this.enabled) return;
-    categories = categories || ['node.perf'];
-    this.tracing = this.traceEvents.createTracing({categories});
-    this.tracing.enable();
-  }
-
-  disable() {
-    if (!this.tracing || !this.enabled) return;
-    this.tracing.disable();
-    this.tracing = undefined;
-  }
-}
-export const TRACER = new Tracer(NODE && require('trace_events'));
-
-export interface TrackerOptions {
-  buf?: Buffer;
-}
-
-export abstract class Tracker {
-  static create(options?: TrackerOptions) {
-    const buf = options && options.buf;
-    return buf ? new BoundedTracker(buf) : new UnboundedTracker();
-  }
-
-  readonly counters: Map<string, number>;
-
-  constructor() {
-    this.counters = new Map();
-  }
-
-  count(name: string, val?: number) {
-    val = val || 1;
-    const c = this.counters.get(name);
-    this.counters.set(name, typeof c !== 'undefined' ? (c + val) : val);
-  }
-
-  abstract add(name: string, val: number): void;
-  abstract stats(pop?: boolean): Map<string, Stats>;
-
-  protected push(dists: Map<string, number[]>, name: string, val: number) {
-    const d = dists.get(name) || [];
-    if (!d.length) dists.set(name, d);
-    d.push(val);
-  }
-
-  // T(M, N): M(N lg N + 3N)
-  protected compute(dists: Map<string, number[]>, pop?: boolean) {
-    const stats = new Map();
-    for (const [name, vals] of dists.entries()) {
-      stats.set(name, Stats.compute(vals, pop));
-    }
-    return stats;
-  }
-}
-
-class UnboundedTracker extends Tracker {
-  protected readonly distributions: Map<string, number[]>;
-
-  constructor() {
-    super();
-    this.distributions = new Map();
-  }
-
-  add(name: string, val: number) {
-    return this.push(this.distributions, name, val);
-  }
-
-  stats(pop?: boolean): Map<string, Stats> {
-    return this.compute(this.distributions, pop);
-  }
-}
-
-class BoundedTracker extends Tracker {
-  protected readonly buf: Buffer;
-  protected readonly next: {tag: number, loc: number, dloc: number};
-  protected readonly tags: Map<string, number>;
-  protected readonly distributions: Map<string, number[]>;
-
-  constructor(buf: Buffer) {
-    super();
-    this.buf = buf;
-    this.next = {tag: 0, loc: 0, dloc: 0};
-    this.tags = new Map();
-    this.distributions = new Map();
-  }
-
-  add(name: string, val: number) {
-    let tag = this.tags.get(name);
-    if (typeof tag === 'undefined') {
-      this.tags.set(name, (tag = this.next.tag++));
-    }
-    this.buf.writeUInt8(tag, this.next.loc);
-    this.buf.writeDoubleBE(val, this.next.loc + 1);
-    this.next.loc += 9;
-  }
-
-  stats(pop?: boolean): Map<string, Stats> {
-    if (this.next.dloc !== this.next.loc) {
-      const names: string[] = [];
-      for (const [name, tag] of this.tags.entries()) {
-        names[tag] = name;
-      }
-
-      while (this.next.dloc < this.next.loc) {
-        const name = names[this.buf.readUInt8(this.next.dloc)];
-        const val = this.buf.readDoubleBE(this.next.dloc + 1);
-        this.push(this.distributions, name, val);
-        this.next.dloc += 9;
-      }
-    }
-    return this.compute(this.distributions, pop);
-  }
-}
-
-export interface TimerOptions extends TrackerOptions {
-  trace?: boolean;
-  perf?: Performance;
-}
-
-export abstract class Timer {
-  static create(options?: TimerOptions) {
-    const tracker = Tracker.create(options);
-    const perf = (options && options.perf) || PERF;
-    const trace = (options && typeof options.trace !== 'undefined') ?
-        !!options.trace :
-        TRACER.enabled;
-    return trace ? new TracingTimer(tracker, perf) :
-                   new BasicTimer(tracker, perf);
-  }
-
-  protected readonly tracker: Tracker;
-  protected readonly perf: Performance;
-  protected started?: number;
-  protected stopped?: number;
-
-  constructor(tracker: Tracker, perf: Performance) {
-    this.tracker = tracker;
-    this.perf = perf;
-  }
-
-  count(name: string, val?: number) {
-    this.tracker.count(name, val);
-  }
-
-  get counters(): Map<string, number> {
-    return this.tracker.counters;
-  }
-
-  get duration(): number|undefined {
-    if (typeof this.started === 'undefined' ||
-        typeof this.stopped === 'undefined') {
-      return undefined;
-    }
-    return this.stopped - this.started;
-  }
-
-  start() {
-    if (!this.started) this.started = this.perf.now();
-  }
-
-  stop() {
-    if (!this.stopped) this.stopped = this.perf.now();
-  }
-
-  stats(pop?: boolean): Map<string, Stats> {
-    return this.tracker.stats(pop);
-  }
-
-  // tslint:disable-next-line:no-any
-  abstract time(name: string): (a: any) => any;
-}
-
-class BasicTimer extends Timer {
-  constructor(tracker: Tracker, perf: Performance) {
-    super(tracker, perf);
-  }
-
-  time(name: string) {
-    if (!this.started || this.stopped) return IDENTITY;
-    const begin = this.perf.now();
-    // tslint:disable-next-line:no-any
-    return (a: any) => {
-      this.tracker.add(name, this.perf.now() - begin);
-      return a;
-    };
-  }
-}
-
-class TracingTimer extends Timer {
-  constructor(tracker: Tracker, perf: Performance) {
-    super(tracker, perf);
-  }
-
-  time(name: string) {
-    if (!this.started || this.stopped) return IDENTITY;
-
-    const b = `b|${name}`;
-    this.perf.mark(b);
-    const begin = this.perf.now();
-
-    // tslint:disable-next-line:no-any
-    return (a: any) => {
-      this.tracker.add(name, this.perf.now() - begin);
-
-      const e = `e|${name}`;
-      this.perf.mark(e);
-      this.perf.measure(name, b, e);
-      return a;
-    };
-  }
-}
-
-// clang-format off
 export interface Stats {
   readonly cnt: number;
   readonly sum: number;
@@ -263,14 +36,13 @@ export interface Stats {
   readonly p95: number;
   readonly p99: number;
 }
-// clang-format on
 
 // T-Distribution two-tailed critical values for 95% confidence.
 // http://www.itl.nist.gov/div898/handbook/eda/section3/eda3672.htm.
 const TABLE = [
   12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228,
-  2.201,  2.179, 2.16,  2.145, 2.131, 2.12,  2.11,  2.101, 2.093, 2.086,
-  2.08,   2.074, 2.069, 2.064, 2.06,  2.056, 2.052, 2.048, 2.045, 2.042,
+  2.201, 2.179, 2.16, 2.145, 2.131, 2.12, 2.11, 2.101, 2.093, 2.086,
+  2.08, 2.074, 2.069, 2.064, 2.06, 2.056, 2.052, 2.048, 2.045, 2.042,
 ];
 const TINF = 1.96;
 
@@ -279,12 +51,12 @@ export class Stats {
 
   // T(N): N lg N + 4N
   static compute(arr: number[], pop?: boolean): Stats {
-    const sorted = arr.slice();    // N
-    sorted.sort((a, b) => a - b);  // N lg N
+    const sorted = arr.slice(); // N
+    sorted.sort((a, b) => a - b); // N lg N
 
-    const sum = Stats.sum(sorted);  // N
+    const sum = Stats.sum(sorted); // N
     const mean = Stats.mean(arr, sum);
-    const variance = Stats.variance(arr, pop, mean);  // 2N
+    const variance = Stats.variance(arr, pop, mean); // 2N
     const stddev = Math.sqrt(variance);
     const error = Stats.standardErrorOfMean(sorted, pop, stddev);
     const margin = Stats.marginOfError(sorted, pop, error);
@@ -294,7 +66,7 @@ export class Stats {
       cnt: sorted.length,
       sum,
       avg: mean,
-      var : variance,
+      var: variance,
       std: stddev,
       sem: error,
       moe: margin,
@@ -370,14 +142,14 @@ export class Stats {
   // T(N): 3N | 2N
   static variance(arr: number[], pop?: boolean, mean?: number): number {
     if (!arr.length) return 0;
-    const n = !!pop ? arr.length : arr.length - 1;
+    const n = pop ? arr.length : arr.length - 1;
     const m = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
     return Stats.sum(arr.map(num => Math.pow(num - m, 2))) / n;
   }
 
   // T(N): 3N | 2N
   static standardDeviation(arr: number[], pop?: boolean, mean?: number):
-      number {
+  number {
     return Math.sqrt(Stats.variance(arr, pop, mean));
   }
 
@@ -399,11 +171,234 @@ export class Stats {
 
   // T(N): 4N | 1
   static relativeMarginOfError(
-      arr: number[], pop?: boolean, moe?: number, mean?: number) {
+    arr: number[], pop?: boolean, moe?: number, mean?: number
+  ) {
     if (!arr.length) return 0;
     const margin =
         typeof moe !== 'undefined' ? moe : Stats.marginOfError(arr, pop);
     const avg = typeof mean !== 'undefined' ? mean : Stats.mean(arr);
     return (margin / avg) * 100;
+  }
+}
+
+export class Tracer {
+  readonly traceEvents?: TraceEvents;
+  tracing?: Tracing;
+
+  constructor(traceEvents?: TraceEvents) {
+    this.traceEvents = traceEvents;
+  }
+
+  get enabled() {
+    return !!this.tracing?.enabled;
+  }
+
+  enable(categories?: string[]) {
+    if (!this.traceEvents || this.enabled) return;
+    categories = categories || ['node.perf'];
+    this.tracing = this.traceEvents.createTracing({categories});
+    this.tracing.enable();
+  }
+
+  disable() {
+    if (!this.tracing || !this.enabled) return;
+    this.tracing.disable();
+    this.tracing = undefined;
+  }
+}
+export const TRACER = new Tracer(NODE && require('trace_events'));
+
+export interface TrackerOptions {
+  buf?: Buffer;
+}
+
+export abstract class Tracker {
+  static create(options?: TrackerOptions) {
+    const buf = options?.buf;
+    return buf ? new BoundedTracker(buf) : new UnboundedTracker();
+  }
+
+  readonly counters: Map<string, number>;
+
+  constructor() {
+    this.counters = new Map();
+  }
+
+  count(name: string, val?: number) {
+    val = val || 1;
+    const c = this.counters.get(name);
+    this.counters.set(name, typeof c !== 'undefined' ? (c + val) : val);
+  }
+
+  abstract add(name: string, val: number): void;
+  abstract stats(pop?: boolean): Map<string, Stats>;
+
+  protected push(dists: Map<string, number[]>, name: string, val: number) {
+    const d = dists.get(name) || [];
+    if (!d.length) dists.set(name, d);
+    d.push(val);
+  }
+
+  // T(M, N): M(N lg N + 3N)
+  protected compute(dists: Map<string, number[]>, pop?: boolean) {
+    const stats = new Map();
+    for (const [name, vals] of dists.entries()) {
+      stats.set(name, Stats.compute(vals, pop));
+    }
+    return stats;
+  }
+}
+
+class UnboundedTracker extends Tracker {
+  protected readonly distributions: Map<string, number[]>;
+
+  constructor() {
+    super();
+    this.distributions = new Map();
+  }
+
+  add(name: string, val: number) {
+    return this.push(this.distributions, name, val);
+  }
+
+  stats(pop?: boolean): Map<string, Stats> {
+    return this.compute(this.distributions, pop);
+  }
+}
+
+class BoundedTracker extends Tracker {
+  protected readonly buf: Buffer;
+  protected readonly next: {tag: number; loc: number; dloc: number};
+  protected readonly tags: Map<string, number>;
+  protected readonly distributions: Map<string, number[]>;
+
+  constructor(buf: Buffer) {
+    super();
+    this.buf = buf;
+    this.next = {tag: 0, loc: 0, dloc: 0};
+    this.tags = new Map();
+    this.distributions = new Map();
+  }
+
+  add(name: string, val: number) {
+    let tag = this.tags.get(name);
+    if (typeof tag === 'undefined') {
+      this.tags.set(name, (tag = this.next.tag++));
+    }
+    this.buf.writeUInt8(tag, this.next.loc);
+    this.buf.writeDoubleBE(val, this.next.loc + 1);
+    this.next.loc += 9;
+  }
+
+  stats(pop?: boolean): Map<string, Stats> {
+    if (this.next.dloc !== this.next.loc) {
+      const names: string[] = [];
+      for (const [name, tag] of this.tags.entries()) {
+        names[tag] = name;
+      }
+
+      while (this.next.dloc < this.next.loc) {
+        const name = names[this.buf.readUInt8(this.next.dloc)];
+        const val = this.buf.readDoubleBE(this.next.dloc + 1);
+        this.push(this.distributions, name, val);
+        this.next.dloc += 9;
+      }
+    }
+    return this.compute(this.distributions, pop);
+  }
+}
+
+export interface TimerOptions extends TrackerOptions {
+  trace?: boolean;
+  perf?: Performance;
+}
+
+export abstract class Timer {
+  static create(options?: TimerOptions) {
+    const tracker = Tracker.create(options);
+    const perf = options?.perf || PERF;
+    const trace = (options && typeof options.trace !== 'undefined')
+      ? !!options.trace
+      : TRACER.enabled;
+    return trace ? new TracingTimer(tracker, perf)
+      : new BasicTimer(tracker, perf);
+  }
+
+  protected readonly tracker: Tracker;
+  protected readonly perf: Performance;
+  protected started?: number;
+  protected stopped?: number;
+
+  constructor(tracker: Tracker, perf: Performance) {
+    this.tracker = tracker;
+    this.perf = perf;
+  }
+
+  count(name: string, val?: number) {
+    this.tracker.count(name, val);
+  }
+
+  get counters(): Map<string, number> {
+    return this.tracker.counters;
+  }
+
+  get duration(): number|undefined {
+    if (typeof this.started === 'undefined' ||
+        typeof this.stopped === 'undefined') {
+      return undefined;
+    }
+    return this.stopped - this.started;
+  }
+
+  start() {
+    if (!this.started) this.started = this.perf.now();
+  }
+
+  stop() {
+    if (!this.stopped) this.stopped = this.perf.now();
+  }
+
+  stats(pop?: boolean): Map<string, Stats> {
+    return this.tracker.stats(pop);
+  }
+
+  abstract time(name: string): (a: any) => any;
+}
+
+class BasicTimer extends Timer {
+  constructor(tracker: Tracker, perf: Performance) {
+    super(tracker, perf);
+  }
+
+  time(name: string) {
+    if (!this.started || this.stopped) return IDENTITY;
+    const begin = this.perf.now();
+    return (a: any) => {
+      this.tracker.add(name, this.perf.now() - begin);
+      return a;
+    };
+  }
+}
+
+class TracingTimer extends Timer {
+  constructor(tracker: Tracker, perf: Performance) {
+    super(tracker, perf);
+  }
+
+  time(name: string) {
+    if (!this.started || this.stopped) return IDENTITY;
+
+    const b = `b|${name}`;
+    this.perf.mark(b);
+    const begin = this.perf.now();
+
+    return (a: any) => {
+      this.tracker.add(name, this.perf.now() - begin);
+
+      const e = `e|${name}`;
+      this.perf.mark(e);
+      this.perf.measure(name, b, e);
+      return a;
+    };
   }
 }

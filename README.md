@@ -1,7 +1,7 @@
 # trakr
-[![npm version](https://img.shields.io/npm/v/trakr.svg)](https://www.npmjs.com/package/trakr)&nbsp;
-[![Build Status](https://api.travis-ci.org/scheibo/trakr.svg)](https://travis-ci.org/scheibo/trakr)&nbsp;
-[![Dependencies](https://img.shields.io/david/scheibo/trakr.svg)](https://david-dm.org/scheibo/trakr)
+
+![Test Status](https://github.com/scheibo/trakr/workflows/Tests/badge.svg)
+[![npm version](https://img.shields.io/npm/v/trakr.svg)](https://www.npmjs.com/package/trakr)
 
 trakr is a minimal library for tracking performance in Javascript applications
 in Node or in the browser. A sibling library, [trakkr][1], exists to extend
@@ -93,4 +93,3 @@ trakr is distributed under the terms of the MIT License.
 
 [1]: https://github.com/scheibo/trakkr
 [2]: https://en.wikipedia.org/wiki/Reservoir_sampling
-

@@ -33,7 +33,7 @@ describe('Tracer', () => {
 
     expect(tracer.enabled).toBe(true);
     expect(events.createTracing).toHaveBeenCalledWith({
-      categories: ['node.perf']
+      categories: ['node.perf'],
     });
     expect(events.createTracing).toHaveBeenCalledTimes(1);
     expect(tracing.enable).toHaveBeenCalledTimes(1);
@@ -155,8 +155,8 @@ describe('Timer', () => {
     test('time', () => {
       const perf = {now: jest.fn(), mark: jest.fn(), measure: jest.fn()};
       perf.now.mockReturnValueOnce(11)
-          .mockReturnValueOnce(17)
-          .mockReturnValueOnce(20);
+        .mockReturnValueOnce(17)
+        .mockReturnValueOnce(20);
       const timer = Timer.create({perf});
       timer.start();
 
@@ -177,8 +177,8 @@ describe('Timer', () => {
     test('time', () => {
       const perf = {now: jest.fn(), mark: jest.fn(), measure: jest.fn()};
       perf.now.mockReturnValueOnce(11)
-          .mockReturnValueOnce(17)
-          .mockReturnValueOnce(20);
+        .mockReturnValueOnce(17)
+        .mockReturnValueOnce(20);
       const timer = Timer.create({perf, trace: true});
       timer.start();
 

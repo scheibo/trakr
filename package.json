@@ -1,13 +1,10 @@
 {
   "name": "trakr",
-  "version": "0.0.5",
+  "version": "0.1.9",
   "description": "Minimal utility for tracking performance",
   "main": "build/index.js",
   "types": "build/index.d.ts",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/scheibo/trakr.git"
-  },
+  "repository": "github:scheibo/trakr",
   "keywords": [
     "minimal",
     "timer",
@@ -17,28 +14,27 @@
   ],
   "author": "Kirk Scheibelhut",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/scheibo/trakr/issues"
-  },
-  "dependencies": {
-    "@types/node": "^11.11.7"
-  },
   "devDependencies": {
-    "@types/jest": "^24.0.11",
-    "gts": "^0.9.0",
-    "jest": "^24.5.0",
-    "ts-jest": "^24.0.0",
-    "typescript": "^3.3.4000"
+    "@pkmn/eslint-config": "^0.6.1",
+    "@types/jest": "^26.0.14",
+    "@types/node": "^14.11.2",
+    "@typescript-eslint/eslint-plugin": "^4.2.0",
+    "@typescript-eslint/parser": "^4.2.0",
+    "eslint": "^7.9.0",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-jest": "^24.0.2",
+    "jest": "^26.4.2",
+    "ts-jest": "^26.4.0",
+    "typescript": "^4.0.3"
   },
   "scripts": {
-    "check": "gts check",
-    "clean": "gts clean",
-    "fix": "gts fix",
+    "lint": "eslint --cache src --ext ts",
+    "fix": "eslint --fix src --ext ts",
     "compile": "tsc -p .",
     "tsc": "tsc -p .",
     "test": "jest",
     "prepare": "npm run compile",
     "pretest": "npm run compile",
-    "posttest": "npm run check"
+    "posttest": "npm run lint"
   }
 }
