@@ -206,7 +206,9 @@ export class Tracer {
     this.tracing = undefined;
   }
 }
-export const TRACER = new Tracer(NODE && require('trace_events'));
+export const TRACER = new Tracer((() => {
+  try { return require('trace_events'); } catch { return undefined; }
+})());
 
 export interface TrackerOptions {
   buf?: Buffer;
